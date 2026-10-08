@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K Book - บันทึกการเงินส่วนตัว</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Google Font: Kanit -->
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Kanit', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 pb-24">
+
+    <!-- Header -->
+    <header class="bg-indigo-600 text-white p-4 shadow-md sticky top-0 z-50">
+        <div class="max-w-md mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">📖 K Book</h1>
+            <div id="auth-header-action"></div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-md mx-auto p-4 space-y-4">
+
+        <!-- 1. หน้าจอ Login / Register -->
+        <div id="auth-section" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mt-10">
+            <h2 id="auth-title" class="text-xl font-bold text-slate-800 mb-1 text-center">เข้าสู่ระบบ K Book</h2>
+            <p class="text-xs text-slate-400 text-center mb-6">ระบบจัดการการเงินและบัญชีบนคลาวด์</p>
+            
+            <form id="auth-form" class="space-y-3">
+                <div>
+                    <label class="text-xs text-slate-500">อีเมล</label>
+                    <input type="email" id="auth-email" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500" placeholder="name@email.com">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-500">รหัสผ่าน</label>
+                    <input type="password" id="auth-password" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500" placeholder="••••••••">
+                </div>
+                <button type="submit" id="auth-btn" class="w-full py-3 bg-indigo-600 text-white font-medium rounded-xl shadow-md hover:bg-indigo-700 transition">เข้าสู่ระบบ</button>
+            </form>
+
+            <div class="text-center mt-4">
+                <button type="button" onclick="toggleAuthMode()" id="auth-toggle-btn" class="text-xs text-indigo-600 hover:underline">ยังไม่มีบัญชี? สมัครสมาชิกใหม่</button>
+            </div>
+        </div>
+
+        <!-- 2. แอปพลิเคชันหลัก (แสดงหลัง Login) -->
+        <div id="app-section" class="space-y-4 hidden">
+            
+            <!-- เมนูแท็บย่อยด้านบน -->
+            <div class="flex bg-slate-200 p-1 rounded-xl">
+                <button type="button" onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="flex-1 py-2 text-xs font-medium rounded-lg bg-white shadow-sm transition">แดชบอร์ด</button>
+                <button type="button" onclick="switchTab('wallets')" id="tab-btn-wallets" class="flex-1 py-2 text-xs font-medium rounded-lg text-slate-600 transition">กระเป๋าเงิน</button>
+                <button type="button" onclick="switchTab('people')" id="tab-btn-people" class="flex-1 py-2 text-xs font-medium rounded-lg text-slate-600 transition">ลูกหนี้/เจ้าหนี้</button>
+            </div>
+
+            <!-- TAB 1: แดชบอร์ด & บันทึกรายการ -->
+            <div id="tab-dashboard" class="space-y-4">
+                <div class="bg-gradient-to-r from-indigo-500 to-violet-600 text-white p-5 rounded-2xl shadow-lg">
+                    <p class="text-sm opacity-90">ยอดสุทธิรวมทุกกระเป๋า</p>
+                    <h2 id="total-balance" class="text-3xl font-bold mt-1">0.00 ฿</h2>
+                </div>
+
+                <!-- ฟอร์มบันทึกรายการ -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="font-semibold text-slate-700 mb-3">✍️ บันทึกรายการใหม่</h3>
+                    <form id="transaction-form" class="space-y-3">
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" id="btn-expense" onclick="setTxType('expense')" class="py-2 text-sm font-medium rounded-xl border border-rose-200 text-rose-600 bg-rose-50 transition">รายจ่าย (-)</button>
+                            <button type="button" id="btn-income" onclick="setTxType('income')" class="py-2 text-sm font-medium rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition">รายรับ (+)</button>
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500">เลือกกระเป๋าเงิน</label>
+                            <select id="tx-wallet" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
+                                <option value="">-- กรุณาเพิ่มกระเป๋าเงินก่อน --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500">จำนวนเงิน (บาท)</label>
+                            <input type="number" id="amount" step="any" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-lg font-semibold" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500">หมวดหมู่</label>
+                            <input type="text" id="category" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500" placeholder="เช่น อาหาร, เงินเดือน, เดินทาง">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500">บันทึกช่วยจำ</label>
+                            <input type="text" id="note" class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500" placeholder="รายละเอียดเพิ่มเติม">
+                        </div>
+                        <button type="submit" class="w-full py-3 bg-indigo-600 text-white font-medium rounded-xl shadow-md hover:bg-indigo-700 transition">บันทึกรายการ</button>
+                    </form>
+                </div>
+
+                <!-- ประวัติรายการล่าสุด -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="font-semibold text-slate-700 mb-3">📋 ประวัติรายการล่าสุด</h3>
+                    <div id="transaction-list" class="space-y-2">
+                        <p class="text-xs text-slate-400 text-center py-4">กำลังโหลดข้อมูล...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: จัดการกระเป๋าเงิน -->
+            <div id="tab-wallets" class="space-y-4 hidden">
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="font-semibold text-slate-700 mb-3">👛 เพิ่มกระเป๋าเงิน / บัญชีธนาคาร</h3>
+                    <form id="wallet-form" class="space-y-3">
+                        <div>
+                            <label class="text-xs text-slate-500">ชื่อกระเป๋า</label>
+                            <input type="text" id="wallet-name" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl" placeholder="เช่น เงินสด, ธนาคารกสิกร">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500">ยอดเงินเริ่มต้น</label>
+                            <input type="number" id="wallet-balance" step="any" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl" placeholder="0.00">
+                        </div>
+                        <button type="submit" class="w-full py-3 bg-indigo-600 text-white font-medium rounded-xl shadow-md">สร้างกระเป๋าเงิน</button>
+                    </form>
+                </div>
+
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="font-semibold text-slate-700 mb-3">💳 กระเป๋าเงินทั้งหมดของคุณ</h3>
+                    <div id="wallet-list" class="space-y-2">
+                        <p class="text-xs text-slate-400 text-center py-4">ยังไม่มีกระเป๋าเงิน</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: จัดการลูกหนี้ / เจ้าหนี้ -->
+            <div id="tab-people" class="space-y-4 hidden">
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="font-semibold text-slate-700 mb-3">👥 เพิ่มรายชื่อ (ลูกหนี้ / เจ้าหนี้)</h3>
+                    <form id="person-form" class="space-y-3">
+                        <div>
+                            <label class="text-xs text-slate-500">ชื่อบุคคล</label>
+                            <input type="text" id="person-name" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl" placeholder="ชื่อ-นามสกุล หรือชื่อเล่น">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500">สถานะ</label>
+                            <select id="person-type" class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                                <option value="debtor">ลูกหนี้ (เขายืมเงินเรา)</option>
+                                <option value="creditor">เจ้าหนี้ (เรายืมเงินเขา)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500">จำนวนเงิน (บาท)</label>
+                            <input type="number" id="person-amount" step="any" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl" placeholder="0.00">
+                        </div>
+                        <button type="submit" class="w-full py-3 bg-indigo-600 text-white font-medium rounded-xl shadow-md">บันทึกข้อมูลบุคคล</button>
+                    </form>
+                </div>
+
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="font-semibold text-slate-700 mb-3">📂 รายชื่อลูกหนี้ / เจ้าหนี้</h3>
+                    <div id="people-list" class="space-y-2">
+                        <p class="text-xs text-slate-400 text-center py-4">ยังไม่มีข้อมูลบุคคล</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- JavaScript ระบบสมบูรณ์ -->
+    <script>
+        const SUPABASE_URL = 'https://zdujaukypdsapfnbxjcv.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_ELoT40vHobIaY4FVaFU5XA_77TNmyWc';
+        
+        const { createClient } = supabase;
+        const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentType = 'expense';
+        let isSignUpMode = false;
+        let currentUser = null;
+
+        function toggleAuthMode() {
+            isSignUpMode = !isSignUpMode;
+            document.getElementById('auth-title').innerText = isSignUpMode ? 'สมัครสมาชิก K Book' : 'เข้าสู่ระบบ K Book';
+            document.getElementById('auth-btn').innerText = isSignUpMode ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ';
+            document.getElementById('auth-toggle-btn').innerText = isSignUpMode ? 'มีบัญชีอยู่แล้ว? เข้าสู่ระบบ' : 'ยังไม่มีบัญชี? สมัครสมาชิกใหม่';
+        }
+
+        function setTxType(type) {
+            currentType = type;
+            const btnExp = document.getElementById('btn-expense');
+            const btnInc = document.getElementById('btn-income');
+            if(type === 'expense') {
+                btnExp.className = "py-2 text-sm font-medium rounded-xl border border-rose-200 text-rose-600 bg-rose-50 transition";
+                btnInc.className = "py-2 text-sm font-medium rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition";
+            } else {
+                btnInc.className = "py-2 text-sm font-medium rounded-xl border border-emerald-200 text-emerald-600 bg-emerald-50 transition";
+                btnExp.className = "py-2 text-sm font-medium rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition";
+            }
+        }
+
+        function switchTab(tab) {
+            ['dashboard', 'wallets', 'people'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                document.getElementById(`tab-btn-${t}`).className = "flex-1 py-2 text-xs font-medium rounded-lg text-slate-600 transition";
+            });
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-btn-${tab}`).className = "flex-1 py-2 text-xs font-medium rounded-lg bg-white shadow-sm transition";
+        }
+
+        document.getElementById('auth-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+
+            if (isSignUpMode) {
+                const { error } = await _supabase.auth.signUp({ email, password });
+                if (error) alert('สมัครสมาชิกไม่สำเร็จ: ' + error.message);
+                else { alert('สมัครสำเร็จ! เข้าสู่ระบบได้เลย'); isSignUpMode = false; toggleAuthMode(); }
+            } else {
+                const { error } = await _supabase.auth.signInWithPassword({ email, password });
+                if (error) alert('เข้าสู่ระบบไม่สำเร็จ: ' + error.message);
+                else { checkUserSession(); }
+            }
+        });
+
+        async function checkUserSession() {
+            const { data: { session } } = await _supabase.auth.getSession();
+            currentUser = session?.user || null;
+            
+            if (currentUser) {
+                document.getElementById('auth-section').classList.add('hidden');
+                document.getElementById('app-section').classList.remove('hidden');
+                document.getElementById('auth-header-action').innerHTML = `<button onclick="logout()" class="text-xs bg-indigo-700 px-3 py-1.5 rounded-lg">ออกจากระบบ</button>`;
+                loadAllData();
+            } else {
+                document.getElementById('auth-section').classList.remove('hidden');
+                document.getElementById('app-section').classList.add('hidden');
+            }
+        }
+
+        async function logout() {
+            await _supabase.auth.signOut();
+            checkUserSession();
+        }
+
+        async function loadAllData() {
+            await loadWallets();
+            await loadTransactions();
+            await loadPeople();
+        }
+
+        // --- WALLETS ---
+        document.getElementById('wallet-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('wallet-name').value;
+            const balance = parseFloat(document.getElementById('wallet-balance').value);
+
+            const { error } = await _supabase.from('wallets').insert([{ user_id: currentUser.id, name, balance }]);
+            if (error) alert('เพิ่มกระเป๋าไม่สำเร็จ: ' + error.message);
+            else {
+                document.getElementById('wallet-name').value = '';
+                document.getElementById('wallet-balance').value = '';
+                loadAllData();
+            }
+        });
+
+        async function loadWallets() {
+            const { data } = await _supabase.from('wallets').select('*');
+            const selectEl = document.getElementById('tx-wallet');
+            const listEl = document.getElementById('wallet-list');
+            
+            if (!data || data.length === 0) {
+                selectEl.innerHTML = `<option value="">-- กรุณาเพิ่มกระเป๋าเงินก่อน --</option>`;
+                listEl.innerHTML = `<p class="text-xs text-slate-400 text-center py-4">ยังไม่มีกระเป๋าเงิน</p>`;
+                document.getElementById('total-balance').innerText = '0.00 ฿';
+                return;
+            }
+
+            let optHtml = '';
+            let listHtml = '';
+            let total = 0;
+
+            data.forEach(w => {
+                total += Number(w.balance);
+                optHtml += `<option value="${w.id}">${w.name} (${Number(w.balance).toLocaleString()} ฿)</option>`;
+                listHtml += `
+                    <div class="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <span class="font-medium text-slate-700 text-sm">${w.name}</span>
+                        <span class="font-semibold text-sm text-indigo-600">${Number(w.balance).toLocaleString()} ฿</span>
+                    </div>
+                `;
+            });
+
+            selectEl.innerHTML = optHtml;
+            listEl.innerHTML = listHtml;
+            document.getElementById('total-balance').innerText = total.toLocaleString() + ' ฿';
+        }
+
+        // --- TRANSACTIONS ---
+        document.getElementById('transaction-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const wallet_id = document.getElementById('tx-wallet').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const category = document.getElementById('category').value;
+            const note = document.getElementById('note').value;
+
+            if (!wallet_id) { alert('กรุณาเลือกกระเป๋าเงิน'); return; }
+
+            const { error } = await _supabase.from('transactions').insert([{ user_id: currentUser.id, wallet_id, type: currentType, amount, category, note }]);
+            if (error) { alert('บันทึกไม่สำเร็จ: ' + error.message); return; }
+
+            const { data: walletData } = await _supabase.from('wallets').select('balance').eq('id', wallet_id).single();
+            let newBalance = currentType === 'income' ? Number(walletData.balance) + amount : Number(walletData.balance) - amount;
+
+            await _supabase.from('wallets').update({ balance: newBalance }).eq('id', wallet_id);
+
+            document.getElementById('amount').value = '';
+            document.getElementById('category').value = '';
+            document.getElementById('note').value = '';
+            loadAllData();
+        });
+
+        async function loadTransactions() {
+            const { data } = await _supabase.from('transactions').select('*').order('created_at', { ascending: false });
+            const listEl = document.getElementById('transaction-list');
+
+            if (!data || data.length === 0) {
+                listEl.innerHTML = `<p class="text-xs text-slate-400 text-center py-4">ยังไม่มีรายการ</p>`;
+                return;
+            }
+
+            let html = '';
+            data.forEach(tx => {
+                const isInc = tx.type === 'income';
+                html += `
+                    <div class="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <div>
+                            <p class="font-medium text-slate-700 text-sm">${tx.category}</p>
+                            <p class="text-xs text-slate-400">${tx.note || '-'}</p>
+                        </div>
+                        <span class="font-semibold text-sm ${isInc ? 'text-emerald-600' : 'text-rose-600'}">
+                            ${isInc ? '+' : '-'}${Number(tx.amount).toLocaleString()} ฿
+                        </span>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        }
+
+        // --- PEOPLE ---
+        document.getElementById('person-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('person-name').value;
+            const type = document.getElementById('person-type').value;
+            const amount = parseFloat(document.getElementById('person-amount').value);
+
+            alert(`บันทึกข้อมูล ${name} (${type === 'debtor' ? 'ลูกหนี้' : 'เจ้าหนี้'}) จำนวน ${amount} บาท สำเร็จ`);
+            document.getElementById('person-name').value = '';
+            document.getElementById('person-amount').value = '';
+        });
+
+        async function loadPeople() {}
+
+        checkUserSession();
+    </script>
+</body>
+</html>
